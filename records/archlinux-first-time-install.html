@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="../styles/prism.css"/>
+    <link rel="stylesheet" href="../styles/core.css"/>
+    <title>第一次尝试安装 Arch Linux | Iso's home</title>
+    <script src="../scripts/prism.js"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css">
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+</head>
+
+<body>
+    <ul id="index-box">
+        <li id="index-sign" class="index-element">Isoheptane's Records</li>
+        <li class="index-element"><a class="index-jump" href="../index.html">Index</a></li>
+        <li class="index-element"><a class="index-jump" href="../categories/index.html">Categories</a></li>
+        <li class="index-element"><a class="index-jump" href="../archives/index.html">Archives</a></li>
+        <li class="index-element"><a class="index-jump" href="../contact.html">Contact</a></li>
+    </ul>
+    <div id="title-background">
+        <div class="text-content" id="title-box">
+            <h1 class="text-title" id="title-main">Install Arch Linux</h1>
+            <h2 class="text-title" id="title-sub">第一次尝试安装 Arch Linux</h2>
+        </div>
+    </div>
+
+    <div id="main-content-box">
+        <div class="text-content content-box">
+            <h2>为什么突然想装 Arch Linux</h2>
+            <p>
+                想起自己有过一段时间没有折腾过 Linux 相关的东西了，这段时间正好想起上次在虚拟机里安装 Arch Linux 失败的经历，恰巧我笔电刚拿回来。但我笔电上安装的是 Windows 11，并且是一个相对较老的 Beta 渠道体验版。所以今天就试着在实体机上安装了一下 Arch Linux。
+            </p>
+            <p>
+                我目前正在使用的笔电是 ThinkPad E14 Gen2 (AMD)。
+            </p>
+
+            <h2>安装 Arch Linux</h2>
+            <p class="block warning">
+                这并不是一篇完整的教程，而是一篇记录。因此，如果要遵循这篇文章的操作，请根据自己的实际情况适当修改。<br/>
+                阅读本文章前建议先阅读<a href="https://wiki.archlinux.org/title/Installation_guide">官方教程</a>。
+            </p>
+            <h3>从U盘启动</h3>
+            <p>写入镜像的话，用 Rufus 向U盘中写入镜像就好了，我选择的 MBR 分区表和 ISO 镜像模式。</p>
+            <p>
+                比较坑的一点是，大部分的笔记本电脑，Secure Boot 都是默认启用的。然而如果要从U盘镜像启动，就必须得把 Secure Boot 关掉。其实我一开始也想到了这一点，但是我看到 BIOS 里那么多的启动项，怀疑其他启动项可能干扰了启动过程（前面的启动项启动失败后便会继续执行后面的启动项），就把硬盘擦除了。事实证明这和启动失败一点关系都没有，也不会删除那些启动项。
+            </p>
+            <p>
+                在关掉了 Secure Boot 之后，就可以从U盘启动 Archiso 了。
+            </p>
+
+            <h3>硬盘分区</h3>
+            <p>
+                联网貌似是自动的，使用 DHCP 获取到了IP地址。所以这部分就没怎么做过（虽然之后还是得做）。
+            </p>
+            <p>
+                我几乎没用过 <code>fdisk</code> 这种分区工具，所以我也是现学现用<del>用完就忘</del>的。按照 Arch Linux 官方的教程，UEFI 模式下应该分出三个分区，分别是 ESP 分区、交换分区和根文件系统分区。ESP 分区我设置了 512MB 的大小，交换分区为 12GB，根文件系统占用其他所有空间。
+            </p>
+<pre class="line-numbers"><code class="language-">Device            Start       End   Sectors  Size Type
+/dev/nvme0n1p1     2048   1048576   1048576  512M EFI System
+/dev/nvme0n1p2  1050624  25165824  25165824   12G Linux swap
+/dev/nvme0n1p3 26216448 500118158 473901711  226G Linux filesystem
+</code></pre>
+            <p>
+                然后我们在分区上创建文件系统。把根文件系统的分区挂载到<code>/mnt</code>上，把 ESP 分区挂载到<code>/mnt/efi</code>上，并开启 swap 分区。
+            </p>
+<pre class="line-numbers"><code class="language-shell"># 创建文件系统
+mkfs.fat -F32 /dev/nvme0n1p1
+mkswap /dev/nvme0n1p2
+mkfs.ext4 /dev/nvme0n1p3
+# 挂载分区
+mount /dev/nvme0n1p3 /mnt
+mount /dev/nvme0n1p1 /mnt/efi
+# 在 swap 分区上开启 swap
+swapon /dev/nvme0n1p2
+</code></pre>
+            <h3>安装 Boot loader</h3>
+            <p>
+                到这一步就可以开始安装了，其实整体上跟着 ArchWiki 上的走就差不多。
+            </p>
+<pre class="line-numbers"><code class="language-shell"># 在 /mnt 下安装必要的包
+# 其实这里还建议安装 dhcpcd 和 base-devel 之类的其他包
+# 不过我安装的时候没有装上，所以后面会比较麻烦
+pacstrap /mnt base linux linux-firmware
+# 生成 fstab
+genfstab -U /mnt >> /mnt/etc/fstab
+# chroot 进系统里
+arch-chroot /mnt
+</code></pre>
+            <p>
+                跟着流程的设置自然不用多说，跟着 ArchWiki 走就好了，现在安装 Boot loader。在 UEFI 下，安装 <code>grub</code> 需要安装两个包：<code>grub</code> 和 <code>efibootmgr</code>。用 <code>pacman</code> 把它们安装上就好了。接下来执行：
+            </p>
+<pre><code class="language-shell">grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB</code></pre>
+            <p>
+                最后需要生成 <code>grub</code> 的配置文件，照着这上面的来就可以了<del>别像我一样第一次把配置文件生成到了<code>/efi/grub/</code>里</del>。然后用 <code>exit</code> 退出 chroot 环境后，就可以 <code>reboot</code> 重启了。重启后应该会看到 <code>grub</code> 选择启动项的页面。
+            </p>
+            <pre><code class="language-shell">grub-mkconfig -o /boot/grub/grub.cfg</code></pre>
+
+            <h2>安装后的一些工作</h2>
+            <h3>创建一个普通用户</h3>
+            <p>
+                首先要做的事情就是创建一个普通用户。
+            </p>
+            <p>
+                日常使用时用 <code>root</code> 用户是非常危险的，如不小心打出了 <code>rm -rf /*</code> 这样的操作。所以日常使用还是有必要创建一个新的用户的，我们用如下指令创建一个新用户 <code>iso</code> 并将这个用户加入到 <code>wheel</code> 这个用户组里。
+            </p>
+            <pre><code class="language-shell">useradd -m -G wheel iso</code></pre>
+            <p>
+                然后用 <code class="language-shell">passwd iso</code> 给这个用户设置一个密码。
+            </p>
+            <p>
+                使用 <code>sudo</code> 指令需要先安装 <code>sudo</code> 这个包，用 <code>pacman -S sudo</code> 安装上就好了。接下来我们需要修改 sudoers 列表，让在 <code>wheel</code> 组中的成员可以使用 <code>sudo</code> 指令。这里我们需要用到 <code>visudo</code> 这个专用的指令打开 <code>vi</code> 来修改 sudoers 列表。不过由于 <code>vi</code> 并不是预装的，所以我们这里还需要创建一个 <code>vi</code> 到 <code>vim</code> 的软链接。
+            </p>
+<pre><code class="language-shell">ln -s /usr/bin/vi /usr/bin/vim
+visudo
+</code></pre>
+            <p>
+                找到下面这一行，去掉注释，然后重启即可。
+            </p>
+<pre><code class="language-"># %wheel ALL=(ALL) ALL</code></pre>
+
+            <h3>安装 KDE</h3>
+            <p>
+                以前用 Manjaro 的时候就用的 KDE，所以在这里我也安装 KDE 好了。首先需要安装显卡驱动，因为我是 AMD 核显用户，所以我就直接安装 <code>xf86-video-amdgpu</code> 了。（其他的显卡可以参考这张图）
+            </p>
+            <img alt="图片" src="../resources/images/arch_video_driver.png" />
+            <p>
+                然后我们安装 Xorg 和桌面环境，并启动桌面管理器：
+            </p>
+<pre class="line-numbers"><code class="language-shell"># 安装 Xorg
+sudo pacman -S xorg
+# 安装 Plasma 桌面环境
+sudo pacman -S plasma
+# 安装并启动桌面管理器服务，用于帮助我们进入桌面环境
+sudo pacman -S sddm
+sudo systemctl enable sddm
+# 关闭之前使用的网络服务，使用桌面环境下使用的 NetworkManager 服务
+# netctl 有可能并没有开启
+sudo systemctl disable netctl
+sudo systemctl enable NetworkManager
+# 安装工具栏工具
+sudo pacman -S network-manager-applet
+
+# 如果你想要的话，你也可以安装上 KDE 的预装应用，不过体积很大，而且有可能你用不到
+sudo pacman -S kde-applications
+</code></pre>
+            <p>
+                这样桌面环境就安装完成了，重启应该就能进入桌面了。
+            </p>
+
+            <h3>配置 ArchlinuxCN 仓库和 AUR</h3>
+            <p class="block reference">
+                Arch Linux 中文社区仓库 是由 Arch Linux 中文社区驱动的非官方用户仓库。包含中文用户常用软件、工具、字体/美化包等。
+            </p>
+            <p class="block reference">
+                Arch 用户软件仓库（Arch User Repository，AUR）是为用户而建、由用户主导的 Arch 软件仓库。AUR 中的软件包以软件包生成脚本（PKGBUILD）的形式提供，用户自己通过 makepkg 生成包，再由 pacman 安装。创建 AUR 的初衷是方便用户维护和分享新软件包，并由官方定期从中挑选软件包进入 community 仓库。
+            </p>
+            <p>
+                有很多包是来自 <a href="https://www.archlinuxcn.org/">ArchlinuxCN</a> 仓库和 <a href="https://aur.archlinux.org/">AUR</a> 的，首先需要配置好 ArchlinuxCN 仓库。打开 <code>/etc/pacman.conf</code> 并在文件末尾添加上这两行：
+            </p>
+<pre><code class="language-editorconfig">[archlinuxcn]
+Server = https://repo.archlinuxcn.org/$arch
+</code></pre>
+            <p>
+                也可以使用镜像站，比如<a href="https://mirrors.tuna.tsinghua.edu.cn/">清华大学开源软件镜像站</a>提供的 ArchlinuxCN 镜像：
+            </p>
+<pre><code class="language-editorconfig">Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch</code></pre>
+            <p>
+                然后同步包列表，安装 key-ring 和 <code>yay</code> (Yet another yaourt)，因为我在 Manjaro 下常用的就是 <code>yay</code>。
+            </p>
+<pre class="line-numbers"><code class="language-shell">sudo pacman -Syu
+sudo pacman -S archlinuxcn-keyring
+sudo pacman -S yay
+</code></pre>
+            <p>
+                yay 是一个 AUR 助手，可以用来管理 AUR 上包。同样，AUR 也是有镜像的，可以通过下面的命令修改到清华大学开源软件镜像站。
+            </p>
+<pre><code class="language-shell">yay --aururl "https://aur.tuna.tsinghua.edu.cn" --save</code></pre>
+
+            <h2>开始使用</h2>
+            <p>
+                到了这里，系统差不多就“能用”了。之后就是安装一些常用的东西，去下载主题什么的了。当然后续还需要更多的调教什么的，不过那就不在“安装”的范畴之内了。
+            </p>
+            <ul>
+                <li><a href="https://archlinux.org/packages/extra/x86_64/konsole/"><code>konsole</code></a></li>
+                <li><a href="https://archlinux.org/packages/extra/x86_64/nautilus/"><code>nautilus</code></a></li>
+                <li><a href="https://archlinux.org/packages/extra/x86_64/firefox/"><code>firefox</code></a></li>
+                <li><a href="https://aur.archlinux.org/packages/icalingua/"><code>icalingua</code></a><sup>AUR</sup></li>
+                <li><a href="https://aur.archlinux.org/packages/visual-studio-code-bin/"><code>visual-studio-code-bin</code></a><sup>AUR</sup></li>
+            </ul>
+            <hr/>
+            <h4>参考资料</h4>
+            <ul>
+                <li><a href="https://wiki.archlinux.org/title/Installation_guide">Arch Linux Installation guide</a></li>
+                <li><a href="https://wiki.archlinux.org/title/GRUB">Arch Linux GRUB</a></li>
+                <li><a href="https://www.viseator.com/2017/05/17/arch_install/">以官方Wiki的方式安装ArchLinux</a></li>
+                <li><a href="https://www.viseator.com/2017/05/19/arch_setup/">ArchLinux安装后的必须配置与图形界面安装教程</a></li>
+            </ul>
+            <hr/>
+            <div class="content-meta">
+                <span class="content-meta-element">发表于 2021/10/13</span>
+                <span class="content-meta-element">更新于 2021/10/16</span>
+                <span class="content-meta-element">分类于 <a href="../categories/linux.html">Linux</a></span>
+            </div>
+        </div>
+        <!-- Article Ending -->
+        <div class="text-content content-box">
+            <div id="gitalk-container"></div>
+            <script src="../scripts/gitalk-init.js"></script>
+        </div>
+    </div>
+
+</body>
